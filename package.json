@@ -38,11 +38,15 @@
     "build-windows-msix": "pwsh -NoProfile -File windows/msix/build-windows-msix.ps1 && pwsh -NoProfile -File windows/msix/validate-msix.ps1"
   },
   "devDependencies": {
+    "next": "16.4.2",
     "turbo": "^2.10.9",
     "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@11.10.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=20.0.0"
+  },
+  "prisma": {
+    "schema": "apps/backend/prisma/schema.prisma"
   }
 }
