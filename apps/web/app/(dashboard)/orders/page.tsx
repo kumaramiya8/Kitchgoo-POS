@@ -154,13 +154,20 @@ export default function OrdersPage() {
             />
           ))
         ) : (
-          <div className="flex flex-col items-center gap-1 py-16 text-center">
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
             <p className="text-sm font-medium text-foreground">
               {tab === "pending" ? "No orders waiting for you" : "No orders here"}
             </p>
             <p className="text-sm text-muted-foreground">
-              New online orders appear here with a sound alert.
+              {tab === "pending"
+                ? "New online orders appear here with a sound alert. Check 'History' to view completed or past orders."
+                : "No orders found in this section."}
             </p>
+            {tab === "pending" && (
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => setTab("history")}>
+                View Past Orders &amp; History
+              </Button>
+            )}
           </div>
         )}
       </Card>

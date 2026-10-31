@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { BalanceSheetTab, BankTab, BudgetsTab } from "@/components/accounting/finance-tabs";
+import { ImportInvoicesDialog } from "@/components/orders/import-invoices-dialog";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const errMsg = (e: unknown) => (e instanceof ApiError ? e.message : "Something went wrong");
@@ -296,9 +297,12 @@ export default function AccountingPage() {
   const [tab, setTab] = useState<Tab>("expenses");
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[32px] font-semibold tracking-tight text-foreground">Accounting</h1>
-        <p className="text-sm text-muted-foreground">Expenses, cash close, profit &amp; loss, balance sheet, budgets, bank reconciliation, tax and branches</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-[32px] font-semibold tracking-tight text-foreground">Accounting</h1>
+          <p className="text-sm text-muted-foreground">Expenses, cash close, profit &amp; loss, balance sheet, budgets, bank reconciliation, tax and branches</p>
+        </div>
+        <ImportInvoicesDialog branchId={branchId} />
       </div>
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (

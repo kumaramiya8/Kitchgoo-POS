@@ -12,6 +12,7 @@ import { useBranch } from "@/hooks/use-branch";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { SchedulesPanel } from "@/components/reports/schedules-panel";
+import { ImportInvoicesDialog } from "@/components/orders/import-invoices-dialog";
 
 interface CatalogEntry {
   key: string;
@@ -53,9 +54,12 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="print:hidden">
-        <h1 className="text-[32px] font-semibold tracking-tight text-foreground">Reports</h1>
-        <p className="text-sm text-muted-foreground">Filter by date, print, export to Excel, PDF or CSV, or email on a schedule</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+        <div>
+          <h1 className="text-[32px] font-semibold tracking-tight text-foreground">Reports</h1>
+          <p className="text-sm text-muted-foreground">Filter by date, print, export to Excel, PDF or CSV, or email on a schedule</p>
+        </div>
+        <ImportInvoicesDialog branchId={branchId} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[220px_1fr]">

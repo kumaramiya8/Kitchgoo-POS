@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase, requireAuth } from "@/lib/server-db";
+import { ensureSeeded } from "@/lib/seed-service";
+
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,8 +12,25 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const branchId = searchParams.get("branchId");
     const tab = searchParams.get("tab") || "active";
+    const channel = searchParams.get("channel");
+    const type = searchParams.get("type");
+    const search = searchParams.get("search");
+    const limitParam = searchParams.get("limit");
+    const limit = limitParam ? Math.min(Math.max(1, Number(limitParam)), 2500) : 250;
 
     const supabase = getServerSupabase();
+
+    if (tab === "history") {
+      const { count: orderCount } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", session!.tenantId);
+
+      if (!orderCount || orderCount === 0) {
+        await ensureSeeded(supabase, session!.tenantId, branchId);
+      }
+    }
+
     let query = supabase
       .from("orders")
       .select(`
@@ -27,12 +47,25 @@ export async function GET(req: NextRequest) {
       query = query.eq("branch_id", branchId);
     }
 
+    if (channel) {
+      query = query.eq("channel", channel);
+    }
+
+    if (type) {
+      query = query.eq("type", type);
+    }
+
+    if (search && search.trim()) {
+      const s = search.trim();
+      query = query.or(`order_number.ilike.%${s}%,guest_name.ilike.%${s}%`);
+    }
+
     if (tab === "pending") {
-      query = query.eq("acceptance", "PENDING");
+      query = query.eq("acceptance", "PENDING").limit(limit);
     } else if (tab === "active") {
-      query = query.in("status", ["OPEN", "BILLED"]);
+      query = query.in("status", ["OPEN", "BILLED"]).limit(limit);
     } else if (tab === "history") {
-      query = query.in("status", ["PAID", "CANCELLED", "REFUNDED"]).limit(100);
+      query = query.in("status", ["PAID", "CANCELLED", "REFUNDED"]).limit(limit);
     }
 
     const { data: orders, error } = await query;

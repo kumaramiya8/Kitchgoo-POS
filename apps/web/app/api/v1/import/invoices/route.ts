@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSupabase, requireAuth } from "@/lib/server-db";
 import allInvoicesData from "@/lib/all-invoices.json";
+import { ensureSeeded } from "@/lib/seed-service";
+
+export const maxDuration = 60;
 
 export interface InvoiceRecord {
   saleDate: string;
@@ -10,6 +13,13 @@ export interface InvoiceRecord {
   totalSales: number;
   totalTax: number;
   items: { itemName: string; qty: number; incTax: number }[];
+}
+
+function cleanItemName(name: string): string {
+  let cleaned = name.trim();
+  cleaned = cleaned.replace(/\.\d+$/, "");
+  cleaned = cleaned.replace(/\.+$/, "");
+  return cleaned.trim();
 }
 
 export async function GET(req: NextRequest) {
@@ -70,13 +80,26 @@ export async function POST(req: NextRequest) {
     const tenantId = session!.tenantId;
     const body = await req.json().catch(() => ({}));
 
+    // If requested to import all bundled at once
+    if (body.all === true || body.autoAll === true) {
+      const seedResult = await ensureSeeded(supabase, tenantId, branchId, true);
+      return NextResponse.json({
+        success: true,
+        importedCount: seedResult.importedOrders || 0,
+        result: seedResult,
+        message: "Successfully seeded all historical data!",
+      });
+    }
+
     // Invoices to process: either custom provided array (from CSV upload) or slice from pre-bundled dataset
     let invoicesToProcess: InvoiceRecord[] = [];
     if (Array.isArray(body.invoices) && body.invoices.length > 0) {
+      // First ensure menu items exist
+      await ensureSeeded(supabase, tenantId, branchId, false);
       invoicesToProcess = body.invoices;
     } else {
       const offset = Number(body.offset || 0);
-      const limit = Number(body.limit || 150);
+      const limit = Number(body.limit || 200);
       invoicesToProcess = (allInvoicesData as InvoiceRecord[]).slice(offset, offset + limit);
     }
 
@@ -115,9 +138,11 @@ export async function POST(req: NextRequest) {
       .select("id, name")
       .eq("tenant_id", tenantId);
 
-    const itemNameToId = new Map(
-      (allMenuItems || []).map((m) => [m.name.toLowerCase().trim(), m.id]),
-    );
+    const itemNameToId = new Map<string, string>();
+    for (const m of allMenuItems || []) {
+      itemNameToId.set(m.name.toLowerCase().trim(), m.id);
+      itemNameToId.set(cleanItemName(m.name).toLowerCase(), m.id);
+    }
     const fallbackItemId = allMenuItems?.[0]?.id || null;
 
     // 3. Prepare Bulk Orders
@@ -185,10 +210,16 @@ export async function POST(req: NextRequest) {
           const incTax = Number(it.incTax || 0);
           const unitPrice = qty > 0 ? Number((incTax / qty).toFixed(2)) : incTax;
 
+          const cleanedName = cleanItemName(it.itemName);
+          const matchedItemId =
+            itemNameToId.get(it.itemName.toLowerCase().trim()) ||
+            itemNameToId.get(cleanedName.toLowerCase()) ||
+            fallbackItemId;
+
           orderItemsToInsert.push({
             tenant_id: tenantId,
             order_id: orderId,
-            menu_item_id: itemNameToId.get(it.itemName.toLowerCase().trim()) || fallbackItemId,
+            menu_item_id: matchedItemId,
             name_snapshot: it.itemName || "Item",
             unit_price_snapshot: unitPrice,
             tax_rate_snapshot: 5,
@@ -201,25 +232,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5. Bulk insert items and payments concurrently
     await Promise.all([
-      orderItemsToInsert.length > 0
-        ? supabase.from("order_items").insert(orderItemsToInsert)
-        : Promise.resolve(),
-      paymentsToInsert.length > 0
-        ? supabase.from("payments").insert(paymentsToInsert)
-        : Promise.resolve(),
+      paymentsToInsert.length > 0 ? supabase.from("payments").insert(paymentsToInsert) : Promise.resolve(),
+      orderItemsToInsert.length > 0 ? supabase.from("order_items").insert(orderItemsToInsert) : Promise.resolve(),
     ]);
 
     return NextResponse.json({
       success: true,
       importedCount: createdOrders.length,
       skippedCount: invoicesToProcess.length - newInvoices.length,
-      totalInBatch: invoicesToProcess.length,
       message: `Successfully imported ${createdOrders.length} invoices.`,
     });
   } catch (err: any) {
-    console.error("Invoice import error:", err);
     return NextResponse.json({ message: err?.message || "Internal server error" }, { status: 500 });
   }
 }
