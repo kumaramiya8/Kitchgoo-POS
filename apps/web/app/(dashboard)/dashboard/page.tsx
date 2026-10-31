@@ -5,6 +5,7 @@ import { ChefHat, ClipboardList, Flame, Globe, ReceiptText, Store, Timer, Trendi
 import Link from "next/link";
 import { useState } from "react";
 import { QuickActions } from "@/components/dashboard/quick-actions";
+import { ImportPromptBanner } from "@/components/dashboard/import-prompt-banner";
 import { TrendChart } from "@/components/dashboard/trend-chart";
 import { OrderDetailDialog } from "@/components/orders/order-detail-dialog";
 import { RefundDialog } from "@/components/orders/refund-dialog";
@@ -86,6 +87,8 @@ export default function DashboardPage() {
       />
 
       <BranchNotice />
+
+      <ImportPromptBanner branchId={branchId} />
 
       <PendingOrdersBanner branchId={branchId} />
 
